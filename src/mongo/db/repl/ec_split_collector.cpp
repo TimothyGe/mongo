@@ -6,36 +6,67 @@ namespace repl {
 namespace {
 const Milliseconds kSplitCollectorSocketTimeout(30 * 1000);  // 30s
 }
-SplitCollector::SplitCollector(executor::TaskExecutor* executor, ReplSetConfig config)
-    : _executor(executor), _rsConfig(config), _pool(0) {}
+SplitCollector::SplitCollector(ReplSetConfig config, const NamespaceString& nss, )
+    : _rsConfig(config), _nss(nss), _documentID(id) {}
 
 SplitCollector::~SplitCollector() {}
 
-Status _connect() {
+Status SplitCollector::_connect(ConnPtr& conn, const HostAndPort& target) {
     Status connectStatus = Status::OK();
+    do {
+        if (!connectStatus.isOK()) {
+            conn->checkConnection();
+        } else {
+            conn->connect(target, "SplitCollector");
+        }
+    } while (!connectStatus.isOK());
 
     return connectStatus;
 }
 
-DBClientBase* _getConnection(const HostAndPort& target) {
-    if (!_conn.get()) {
-        _conn.reset(new ConnectionPool::ConnectionPtr(
-            &_pool, target, Date_t::now(), kSplitCollectorSocketTimeout));
-    };
-    return _conn->get();
-};
+BSONObj SplitCollector::_makeFindQuery() const {
+    BSONObjBuilder queryBob;
+    queryBob.append("query", BSON("_id" << _documentID));
+    return queryBob.obj();
+}
 
-void SplitCollector::_collect(const NamespaceString& nss) noexcept {
-    for (auto& target : servers) {
-        _cursor =
-            std::make_unique<DBClientCursor>(_getConnection(target),
-                                             _nss,
-                                             _makeFindQuery(nss),
-                                             0,
-                                             0,
-                                             QueryOption_CursorTailable | QueryOption_AwaitData |
-                                                 QueryOption_OplogReplay | QueryOption_Exhaust,
-                                             1);
+
+// {
+//     projection:{
+//         split:{
+//             $arrayElemAt: ['$ec', 0]
+//         }
+//     }
+// }
+BSONObj* SplitCollector::_makeProjection(int mid) const {
+    BSONObjBuilder projBob;
+    std::string arrJSON = "{$arrayElemAt: ['ec', " + std::to_string(mid) + "]}";
+    projBob.append("projection", BSON("split" << fromjson(arrJSON)));
+    return &projBob.obj();
+}
+
+void SplitCollector::_collect() noexcept {
+    for (auto& m : _rsConfig.members()) {
+        auto target = m.getHostAndPort()
+        // if (target.isSelf()) {
+        //     continue;
+        // }
+        int mid = 0;
+        auto conn = std::make_unique<DBClientConnection>(true);
+        auto connStatus = _connect(conn, target);  // loop
+        auto handler = [mid](const BSONObj& queryResult) {
+            _splits[mid] = std::move(queryResult["split"].String());
+        };
+
+        // QueryOption_Exhaust
+        auto count = conn->query(handler,
+                                 _nss,
+                                 _makeFindQuery(),
+                                 _makeProjection(mid),
+                                 QueryOption_SlaveOk | QueryOption_Exhaust);
+    }
+    for (auto& s : _splits) {
+        
     }
 }
 

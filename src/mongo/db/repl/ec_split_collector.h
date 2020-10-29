@@ -10,30 +10,29 @@
 namespace mongo {
 namespace repl {
 
+using ConnPtr = std::unique_ptr<DBClientConnection>;
+using CursorPtr = std::unique_ptr<DBClientCursor>;
+
 class SplitCollector {
     SplitCollector(const SplitCollector&) = delete;
     SplitCollector& operator=(const SplitCollector&) = delete;
 
 public:
-    SplitCollector(executor::TaskExecutor* executor, ReplSetConfig config);
+    SplitCollector(ReplSetConfig config, const NamespaceString& nss);
 
     virtual ~SplitCoollector();
 
 private:
-    void _collect(const NamespaceString& nss) noexcept;
+    void _collect() noexcept;
 
-    Status _connect();
+    Status _connect(ConnPtr& conn, const HostAndPort& target);
 
-    DBClientBase* _getConnection(const HostAndPort& target);
+    BSONObj _makeFindQuery() const;
+    BSONObj* _makeProjection(int mid) const;
 
-    void _createNewCursor(bool initialFind);
-
-    BSONObj _makeFindQuery(const NamespaceString& _nss) const;
-
-    ConnectionPool _pool;
-    std::unique_ptr<ConnectionPool::ConnectionPtr> _conn;
-
-    const int _batchSize;
+    ReplSetConfig _rsConfig;
+    NamespaceString _nss;
+    std::vector<std::string> _splits;
 };
 
 }  // namespace repl
