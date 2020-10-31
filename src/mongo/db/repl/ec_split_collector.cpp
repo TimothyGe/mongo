@@ -1,13 +1,16 @@
 #include "mongo/db/repl/ec_split_collector.h"
 
+#include "mongo/db/jsobj.h"
+#include "mongo/logv2/log.h"
+
 namespace mongo {
 namespace repl {
 
 namespace {
 const Milliseconds kSplitCollectorSocketTimeout(30 * 1000);  // 30s
 }
-SplitCollector::SplitCollector(ReplSetConfig config, const NamespaceString& nss, )
-    : _rsConfig(config), _nss(nss), _documentID(id) {}
+SplitCollector::SplitCollector(ReplSetConfig config, const NamespaceString& nss, const OID& oid)
+    : _rsConfig(config), _nss(nss), _oid(oid) {}
 
 SplitCollector::~SplitCollector() {}
 
@@ -26,10 +29,9 @@ Status SplitCollector::_connect(ConnPtr& conn, const HostAndPort& target) {
 
 BSONObj SplitCollector::_makeFindQuery() const {
     BSONObjBuilder queryBob;
-    queryBob.append("query", BSON("_id" << _documentID));
+    queryBob.append("query", BSON("_id" << _oid));
     return queryBob.obj();
 }
-
 
 // {
 //     projection:{
@@ -40,17 +42,13 @@ BSONObj SplitCollector::_makeFindQuery() const {
 // }
 BSONObj* SplitCollector::_makeProjection(int mid) const {
     BSONObjBuilder projBob;
-    std::string arrJSON = "{$arrayElemAt: ['ec', " + std::to_string(mid) + "]}";
-    projBob.append("projection", BSON("split" << fromjson(arrJSON)));
+    projBob.append("projection", BSON("split" << BSON("$arrayElemAt" << BSON_ARRAY("$ec" << mid))));
     return &projBob.obj();
 }
 
 void SplitCollector::_collect() noexcept {
     for (auto& m : _rsConfig.members()) {
         auto target = m.getHostAndPort()
-        // if (target.isSelf()) {
-        //     continue;
-        // }
         int mid = 0;
         auto conn = std::make_unique<DBClientConnection>(true);
         auto connStatus = _connect(conn, target);  // loop
@@ -66,7 +64,6 @@ void SplitCollector::_collect() noexcept {
                                  QueryOption_SlaveOk | QueryOption_Exhaust);
     }
     for (auto& s : _splits) {
-        
     }
 }
 

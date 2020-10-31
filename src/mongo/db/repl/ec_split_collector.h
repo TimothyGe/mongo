@@ -18,7 +18,7 @@ class SplitCollector {
     SplitCollector& operator=(const SplitCollector&) = delete;
 
 public:
-    SplitCollector(ReplSetConfig config, const NamespaceString& nss);
+    SplitCollector(ReplSetConfig config, const NamespaceString& nss, const OID& oid);
 
     virtual ~SplitCoollector();
 
@@ -30,6 +30,7 @@ private:
     BSONObj _makeFindQuery() const;
     BSONObj* _makeProjection(int mid) const;
 
+    const std::string& _documentID;
     ReplSetConfig _rsConfig;
     NamespaceString _nss;
     std::vector<std::string> _splits;
