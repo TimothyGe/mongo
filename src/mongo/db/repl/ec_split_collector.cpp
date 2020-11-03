@@ -27,12 +27,6 @@ Status SplitCollector::_connect(ConnPtr& conn, const HostAndPort& target) {
     return connectStatus;
 }
 
-BSONObj SplitCollector::_makeFindQuery() const {
-    BSONObjBuilder queryBob;
-    queryBob.append("query", BSON("_id" << _oid));
-    return queryBob.obj();
-}
-
 // {
 //     projection:{
 //         split:{
@@ -40,16 +34,18 @@ BSONObj SplitCollector::_makeFindQuery() const {
 //         }
 //     }
 // }
-BSONObj* SplitCollector::_makeProjection(int mid) const {
-    BSONObjBuilder projBob;
-    projBob.append("projection", BSON("split" << BSON("$arrayElemAt" << BSON_ARRAY("$ec" << mid))));
-    return &projBob.obj();
+
+BSONObj SplitCollector::_makeFindQuery(int mid) const {
+    BSONObjBuilder queryBob;
+    queryBob.append("query", BSON("_id" << _oid));
+    queryBob.append("projection", BSON("split" << BSON("$arrayElemAt" << BSON_ARRAY("$ec" << mid))));
+    return queryBob.obj();
 }
 
 void SplitCollector::_collect() noexcept {
-    for (auto& m : _rsConfig.members()) {
-        auto target = m.getHostAndPort()
-        int mid = 0;
+    const auto& members = _rsConfig.members();
+    for (auto mid = 0; mid < members.size(); ++mid) {
+        auto target = members[mid].getHostAndPort();
         auto conn = std::make_unique<DBClientConnection>(true);
         auto connStatus = _connect(conn, target);  // loop
         auto handler = [mid](const BSONObj& queryResult) {
@@ -59,8 +55,8 @@ void SplitCollector::_collect() noexcept {
         // QueryOption_Exhaust
         auto count = conn->query(handler,
                                  _nss,
-                                 _makeFindQuery(),
-                                 _makeProjection(mid),
+                                 _makeFindQuery(mid),
+                                 nullptr,
                                  QueryOption_SlaveOk | QueryOption_Exhaust);
     }
     for (auto& s : _splits) {

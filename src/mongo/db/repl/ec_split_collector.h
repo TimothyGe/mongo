@@ -27,8 +27,7 @@ private:
 
     Status _connect(ConnPtr& conn, const HostAndPort& target);
 
-    BSONObj _makeFindQuery() const;
-    BSONObj* _makeProjection(int mid) const;
+    BSONObj _makeFindQuery(int mid) const;
 
     const std::string& _documentID;
     ReplSetConfig _rsConfig;
