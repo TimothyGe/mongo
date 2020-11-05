@@ -1716,6 +1716,12 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
 
     DbResponse dbresponse;
     if (op == dbMsg || (op == dbQuery && isCommand)) {
+        LOGV2_DEBUG(30004,
+                        2,
+                        "handleRequest",
+                        "cmd"_attr = isCommand ? "yes" : "no",
+                        "nsString"_attr = nsString.toString().c_str(),
+                        "op"_attr = op == dbMsg ? "dbMsg" : "dbQuery");
         dbresponse = receivedCommands(opCtx, m, behaviors);
         // The hello/isMaster commands should take kMaxAwaitTimeMs at most, log if it takes twice
         // that.

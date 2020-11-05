@@ -723,6 +723,10 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
             while (state == PlanExecutor::ExecState::ADVANCED && docs.size() < limit) {
                 state = planExecutor->getNext(&out, nullptr);
                 if (state == PlanExecutor::ExecState::ADVANCED) {
+                    LOGV2_DEBUG(30001,
+                        2,
+                        "StorageInterfaceImpl::_findOrDeleteDocuments called for docs: {doc}",
+                        "doc"_attr = out);
                     docs.push_back(out.getOwned());
                 }
             }

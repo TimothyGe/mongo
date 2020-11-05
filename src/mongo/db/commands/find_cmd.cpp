@@ -517,6 +517,10 @@ public:
                    PlanExecutor::ADVANCED == (state = exec->getNext(&doc, nullptr))) {
                 // If we can't fit this result inside the current batch, then we stash it for later.
                 BSONObj obj = doc.toBson();
+                LOGV2_DEBUG(30002,
+                        2,
+                        "FindCmd::Invocation::run called for docs",
+                        "doc"_attr = obj.toString());
                 if (!FindCommon::haveSpaceForNext(obj, numResults, firstBatch.bytesUsed())) {
                     exec->enqueue(obj);
                     break;

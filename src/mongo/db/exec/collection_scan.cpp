@@ -224,7 +224,10 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     member->recordId = record->id;
     member->resetDocument(opCtx()->recoveryUnit()->getSnapshotId(), record->data.releaseToBson());
     _workingSet->transitionToRecordIdAndObj(id);
-
+    LOGV2_DEBUG(30006,
+                2,
+                "PlanExecutorImpl::_getNextImpl",
+                "doc"_attr = member->doc.value().toString());
     return returnIfMatches(member, id, out);
 }
 

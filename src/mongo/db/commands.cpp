@@ -153,6 +153,10 @@ BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgR
     rpc::OpMsgReplyBuilder replyBuilder;
     std::unique_ptr<CommandInvocation> invocation;
     try {
+        LOGV2_DEBUG(30005,
+                  2,
+                  "runCommandDirectly",
+                  "db"_attr = request.getDatabase().toString());
         invocation = command->parse(opCtx, request);
         invocation->run(opCtx, &replyBuilder);
         auto body = replyBuilder.getBodyBuilder();

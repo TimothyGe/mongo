@@ -598,6 +598,10 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                                                         Document{member->keyData[0].keyData});
                     }
                 } else if (member->hasObj()) {
+                    LOGV2_DEBUG(30003,
+                            2,
+                            "PlanExecutorImpl::_getNextImpl",
+                            "doc"_attr = member->doc.value().toString());
                     std::swap(*objOut, member->doc);
                 } else {
                     _workingSet->free(id);
