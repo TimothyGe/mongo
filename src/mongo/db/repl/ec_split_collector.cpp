@@ -22,12 +22,11 @@ SplitCollector::SplitCollector(const ReplicationCoordinator* replCoord,
       _oid(out->getStringField("_id")),
       _out(out) {
 
-    LOGV2_DEBUG(30008,
-                2,
-                "SplitCollector::SplitCollector",
-                "ns"_attr = _nss.toString(),
-                "self"_attr = _replCoord->getSelfIndex(),
-                "_oid"_attr = _oid.toString());
+    LOGV2(30008,
+            "SplitCollector::SplitCollector",
+            "ns"_attr = _nss.toString(),
+            "self"_attr = _replCoord->getSelfIndex(),
+            "_oid"_attr = _oid.toString());
 }
 
 SplitCollector::~SplitCollector() {}
@@ -57,10 +56,16 @@ BSONObj SplitCollector::_makeFindQuery() const {
 
 void SplitCollector::collect() noexcept {
     const auto& members = _replCoord->getConfig().members();
+    LOGV2(30011,
+            "SplitCollector::collect, members",
+            "member.size"_attr = members.size());
     for (auto mid = 0; mid < members.size(); ++mid) {
         if (mid == _replCoord->getSelfIndex())
             continue;
         auto target = members[mid].getHostAndPort();
+        LOGV2(30012,
+            "SplitCollector::collect, target",
+            "target"_attr = target.toString());
         auto conn = std::make_unique<DBClientConnection>(true);
         auto connStatus = _connect(conn, target);
         auto handler = [mid, this](const BSONObj& queryResult) {
