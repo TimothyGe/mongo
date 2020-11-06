@@ -35,15 +35,18 @@ Status SplitCollector::_connect(ConnPtr& conn, const HostAndPort& target) {
     Status connectStatus = Status::OK();
     do {
         if (!connectStatus.isOK()) {
+            LOGV2(30014,
+                "SplitCollector::_connect reconnecting");
             conn->checkConnection();
         } else {
-            conn->connect(target, "SplitCollector");
+            LOGV2(30013,
+                "SplitCollector::_connect try connecting");
+            connectStatus = conn->connect(target, "SplitCollector");
         }
     } while (!connectStatus.isOK());
 
-    LOGV2_DEBUG(30009,
-                2,
-                "SplitCollector::_connect success");
+    LOGV2(30009,
+        "SplitCollector::_connect success");
 
     return connectStatus;
 }
@@ -69,19 +72,18 @@ void SplitCollector::collect() noexcept {
         auto conn = std::make_unique<DBClientConnection>(true);
         auto connStatus = _connect(conn, target);
         auto handler = [mid, this](const BSONObj& queryResult) {
-            _splits[mid] = queryResult.getStringField(splitsFieldName);
+            this->_splits[mid] = queryResult.getStringField(splitsFieldName);
         };
 
         _projection =
             BSON("o" << BSON(splitsFieldName
                              << BSON("$arrayElemAt" << BSON_ARRAY(std::string("$") + splitsFieldName << mid))));
 
-        LOGV2_DEBUG(30007,
-                    2,
-                    "SplitCollector::collect",
-                    "mid"_attr = mid,
-                    "self"_attr = _replCoord->getSelfIndex(),
-                    "_projection"_attr = _projection.toString());
+        LOGV2(30007,
+              "SplitCollector::collect",
+              "mid"_attr = mid,
+              "self"_attr = _replCoord->getSelfIndex(),
+              "_projection"_attr = _projection.toString());
 
         // QueryOption_Exhaust
         auto count = conn->query(handler,
