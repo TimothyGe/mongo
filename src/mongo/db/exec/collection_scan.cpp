@@ -232,7 +232,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
         "nss"_attr = collection()->ns().toString(),
         "isOplog"_attr = collection()->ns().isOplog(),
         "primary"_attr = replCoord->getMemberState().primary());
-    if (!collection()->ns().isOplog() && replCoord->getMemberState().primary()) { // so far only primary serves read
+    if (!collection()->ns().isOnInternalDb() && replCoord->getMemberState().primary()) { // so far only primary serves read
         LOGV2(30006,
                 "PlanExecutorImpl::_getNextImpl, collect splits",
                 "doc"_attr = bsonToReturn.toString());
