@@ -3,11 +3,15 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_connection.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/erasure_coder.h"
 
 namespace mongo {
 namespace repl {
+
+const Milliseconds kSplitCollectorSocketTimeout(30 * 1000);  // 30s
+const int splitCollectorBatchSize = (16 * 1024 * 1024) / 12 * 10;
 
 class ReplicationCoordinator;
 

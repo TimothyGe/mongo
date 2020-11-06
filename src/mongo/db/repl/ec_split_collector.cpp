@@ -11,22 +11,17 @@
 namespace mongo {
 namespace repl {
 
-namespace {
-const Milliseconds kSplitCollectorSocketTimeout(30 * 1000);  // 30s
-}
 SplitCollector::SplitCollector(const ReplicationCoordinator* replCoord,
                                const NamespaceString& nss,
                                BSONObj* out)
-    : _replCoord(replCoord),
-      _nss(nss),
-      _out(out) {
+    : _replCoord(replCoord), _nss(nss), _out(out) {
 
     out->getObjectID(_oidElem);
     LOGV2(30008,
-            "SplitCollector::SplitCollector",
-            "ns"_attr = _nss.toString(),
-            "self"_attr = _replCoord->getSelfIndex(),
-            "_oid"_attr = _oidElem.toString());
+          "SplitCollector::SplitCollector",
+          "ns"_attr = _nss.toString(),
+          "self"_attr = _replCoord->getSelfIndex(),
+          "_oid"_attr = _oidElem.toString());
 }
 
 SplitCollector::~SplitCollector() {}
@@ -35,18 +30,15 @@ Status SplitCollector::_connect(ConnPtr& conn, const HostAndPort& target) {
     Status connectStatus = Status::OK();
     do {
         if (!connectStatus.isOK()) {
-            LOGV2(30014,
-                "SplitCollector::_connect reconnecting");
+            LOGV2(30014, "SplitCollector::_connect, reconnect", "target"_attr = target.toString());
             conn->checkConnection();
         } else {
-            LOGV2(30013,
-                "SplitCollector::_connect try connecting");
+            LOGV2(30012, "SplitCollector::_connect, connect", "target"_attr = target.toString());
             connectStatus = conn->connect(target, "SplitCollector");
         }
     } while (!connectStatus.isOK());
 
-    LOGV2(30009,
-        "SplitCollector::_connect success");
+    LOGV2(30012, "SplitCollector::_connect, success", "target"_attr = target.toString());
 
     return connectStatus;
 }
@@ -59,38 +51,46 @@ BSONObj SplitCollector::_makeFindQuery() const {
 
 void SplitCollector::collect() noexcept {
     const auto& members = _replCoord->getConfig().members();
-    LOGV2(30011,
-            "SplitCollector::collect, members",
-            "member.size"_attr = members.size());
-    for (auto mid = 0; mid < members.size(); ++mid) {
-        if (mid == _replCoord->getSelfIndex())
+    LOGV2(30011, "SplitCollector::collect, members", "member.size"_attr = members.size());
+    for (auto memId = 0; memId < members.size(); ++memId) {
+        if (memId == _replCoord->getSelfIndex())
             continue;
-        auto target = members[mid].getHostAndPort();
-        LOGV2(30012,
-            "SplitCollector::collect, target",
-            "target"_attr = target.toString());
+        auto target = members[memId].getHostAndPort();
+
         auto conn = std::make_unique<DBClientConnection>(true);
         auto connStatus = _connect(conn, target);
-        auto handler = [mid, this](const BSONObj& queryResult) {
-            this->_splits[mid] = queryResult.getStringField(splitsFieldName);
-        };
 
-        _projection =
-            BSON("o" << BSON(splitsFieldName
-                             << BSON("$arrayElemAt" << BSON_ARRAY(std::string("$") + splitsFieldName << mid))));
+        _projection = BSON(
+            "o" << BSON(splitsFieldName << BSON("$arrayElemAt" << BSON_ARRAY(
+                                                    std::string("$") + splitsFieldName << memId))));
 
         LOGV2(30007,
               "SplitCollector::collect",
-              "mid"_attr = mid,
+              "memId"_attr = memId,
               "self"_attr = _replCoord->getSelfIndex(),
               "_projection"_attr = _projection.toString());
 
-        // QueryOption_Exhaust
-        auto count = conn->query(handler,
-                                 _nss,
-                                 _makeFindQuery(),
-                                 &_projection,
-                                 QueryOption_SlaveOk | QueryOption_Exhaust);
+        auto cursor = std::make_unique<DBClientCursor>(
+            conn.get(),
+            _nss,
+            _makeFindQuery(),
+            0 /* nToReturn */,
+            0 /* nToSkip */,
+            &_projection /* fieldsToReturn */,
+            QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_Exhaust,
+            splitCollectorBatchSize);
+
+        while (cursor->more()) {
+            BSONObj qresult = cursor->next();
+
+            LOGV2(30015,
+                  "SplitCollector::collect",
+                  "memId"_attr = memId,
+                  "qresult"_attr = qresult.toString());
+
+            _splits[memId] = qresult.getStringField(splitsFieldName);
+            invariant(!cursor->more());
+        }
     }
 
     _toBSON();
