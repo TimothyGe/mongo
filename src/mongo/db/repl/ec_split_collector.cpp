@@ -19,14 +19,14 @@ SplitCollector::SplitCollector(const ReplicationCoordinator* replCoord,
                                BSONObj* out)
     : _replCoord(replCoord),
       _nss(nss),
-      _oid(out->getStringField("_id")),
       _out(out) {
 
+    out->getObjectID(_oidElem);
     LOGV2(30008,
             "SplitCollector::SplitCollector",
             "ns"_attr = _nss.toString(),
             "self"_attr = _replCoord->getSelfIndex(),
-            "_oid"_attr = _oid.toString());
+            "_oid"_attr = _oidElem.toString());
 }
 
 SplitCollector::~SplitCollector() {}
@@ -50,7 +50,7 @@ Status SplitCollector::_connect(ConnPtr& conn, const HostAndPort& target) {
 
 BSONObj SplitCollector::_makeFindQuery() const {
     BSONObjBuilder queryBob;
-    queryBob.append("query", BSON("_id" << _oid));
+    queryBob.append("query", BSON(_oidElem));
     return queryBob.obj();
 }
 

@@ -230,11 +230,14 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     LOGV2(30010,
         "PlanExecutorImpl::_getNextImpl, collect splits",
         "nss"_attr = collection()->ns().toString(),
-        "isOplog"_attr = collection()->ns().isOplog(),
+        "isOnInternalDb"_attr = collection()->ns().isOnInternalDb(),
         "primary"_attr = replCoord->getMemberState().primary());
     if (!collection()->ns().isOnInternalDb() && replCoord->getMemberState().primary()) { // so far only primary serves read
         LOGV2(30006,
                 "PlanExecutorImpl::_getNextImpl, collect splits",
+                "nss"_attr = collection()->ns().toString(),
+                "isOnInternalDb"_attr = collection()->ns().isOnInternalDb(),
+                "primary"_attr = replCoord->getMemberState().primary(),
                 "doc"_attr = bsonToReturn.toString());
         
         _spcltr = std::make_unique<repl::SplitCollector>(replCoord,

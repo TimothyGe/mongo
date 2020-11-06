@@ -33,7 +33,7 @@ private:
     BSONObj _makeFindQuery() const;
     void _toBSON() const;
 
-    OID _oid;
+    BSONElement _oidElem;
     BSONObj* _out;
     BSONObj _projection;
     NamespaceString _nss;
