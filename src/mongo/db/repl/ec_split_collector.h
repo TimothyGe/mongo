@@ -41,7 +41,7 @@ private:
     BSONObj* _out;
     BSONObj _projection;
     NamespaceString _nss;
-    std::vector<std::string> _splits;
+    std::vector<std::pair<std::string, int>> _splits;
     const ReplicationCoordinator* _replCoord;
 };
 

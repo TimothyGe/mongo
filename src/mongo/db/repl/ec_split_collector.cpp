@@ -15,7 +15,6 @@ SplitCollector::SplitCollector(const ReplicationCoordinator* replCoord,
                                const NamespaceString& nss,
                                BSONObj* out)
     : _replCoord(replCoord), _nss(nss), _out(out) {
-
     out->getObjectID(_oidElem);
     LOGV2(30008,
           "SplitCollector::SplitCollector",
@@ -33,7 +32,7 @@ Status SplitCollector::_connect(ConnPtr& conn, const HostAndPort& target) {
             LOGV2(30014, "SplitCollector::_connect, reconnect", "target"_attr = target.toString());
             conn->checkConnection();
         } else {
-            LOGV2(30012, "SplitCollector::_connect, connect", "target"_attr = target.toString());
+            LOGV2(30013, "SplitCollector::_connect, connect", "target"_attr = target.toString());
             connectStatus = conn->connect(target, "SplitCollector");
         }
     } while (!connectStatus.isOK());
@@ -51,6 +50,7 @@ BSONObj SplitCollector::_makeFindQuery() const {
 
 void SplitCollector::collect() noexcept {
     const auto& members = _replCoord->getConfig().members();
+    _splits.reserve(members.size());
     LOGV2(30011, "SplitCollector::collect, members", "member.size"_attr = members.size());
     for (auto memId = 0; memId < members.size(); ++memId) {
         if (memId == _replCoord->getSelfIndex())
@@ -70,27 +70,24 @@ void SplitCollector::collect() noexcept {
               "self"_attr = _replCoord->getSelfIndex(),
               "_projection"_attr = _projection.toString());
 
-        auto cursor = std::make_unique<DBClientCursor>(
-            conn.get(),
+        conn->query(
+            [=](DBClientCursorBatchIterator& i) {
+                BSONObj qresult;
+                while (i.moreInCurrentBatch()) {
+                    qresult = i.nextSafe();
+                    invariant(!i.moreInCurrentBatch());
+                }
+                LOGV2(30015,
+                      "SplitCollector::collect",
+                      "memId"_attr = memId,
+                      "qresult"_attr = qresult.toString());
+                
+                this->_splits.emplace_back(std::make_pair(qresult.getStringField(splitsFieldName), memId));
+            },
             _nss,
             _makeFindQuery(),
-            0 /* nToReturn */,
-            0 /* nToSkip */,
             &_projection /* fieldsToReturn */,
-            QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_Exhaust,
-            splitCollectorBatchSize);
-
-        while (cursor->more()) {
-            BSONObj qresult = cursor->next();
-
-            LOGV2(30015,
-                  "SplitCollector::collect",
-                  "memId"_attr = memId,
-                  "qresult"_attr = qresult.toString());
-
-            _splits[memId] = qresult.getStringField(splitsFieldName);
-            invariant(!cursor->more());
-        }
+            QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_Exhaust);
     }
 
     _toBSON();
