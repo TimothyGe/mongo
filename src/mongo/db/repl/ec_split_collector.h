@@ -2,13 +2,14 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/client/connection_pool.h"
 #include "mongo/client/dbclient_connection.h"
-#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/erasure_coder.h"
 
 namespace mongo {
 namespace repl {
+
+class ReplicationCoordinator;
 
 using ConnPtr = std::unique_ptr<DBClientConnection>;
 using CursorPtr = std::unique_ptr<DBClientCursor>;
@@ -18,21 +19,26 @@ class SplitCollector {
     SplitCollector& operator=(const SplitCollector&) = delete;
 
 public:
-    SplitCollector(ReplSetConfig config, const NamespaceString& nss, const OID& oid);
+    SplitCollector(const ReplicationCoordinator* replCoord,
+                    const NamespaceString& nss,
+                    BSONObj* out);
 
-    virtual ~SplitCoollector();
+    virtual ~SplitCollector();
+    void collect() noexcept;
+
+    std::vector<std::string> getSplits() const;
 
 private:
-    void _collect() noexcept;
-
     Status _connect(ConnPtr& conn, const HostAndPort& target);
+    BSONObj _makeFindQuery() const;
+    void _toBSON() const;
 
-    BSONObj _makeFindQuery(int mid) const;
-
-    const std::string& _documentID;
-    ReplSetConfig _rsConfig;
+    OID _oid;
+    BSONObj* _out;
+    BSONObj _projection;
     NamespaceString _nss;
     std::vector<std::string> _splits;
+    const ReplicationCoordinator* _replCoord;
 };
 
 }  // namespace repl
