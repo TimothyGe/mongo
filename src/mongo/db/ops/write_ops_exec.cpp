@@ -616,6 +616,9 @@ WriteResult performInserts(OperationContext* opCtx,
                 const auto &erasureCoder = replCoord->getErasureCoder();
 
                 toInsert = erasureCoder.encodeDocument(*opCtx, *indexCatalog, toInsert);
+                LOGV2(30018,
+                    "performInserts",
+                    "toInsert"_attr = toInsert.toString());
             }
 
             batch.emplace_back(stmtId, toInsert);

@@ -1,3 +1,4 @@
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 #include <algorithm>
 #include <isa-l.h>
 #include <set>
@@ -120,8 +121,12 @@ BSONObj ErasureCoder::encodeDocument(OperationContext &opCtx,
     const auto splits = encodeData(reinterpret_cast<const std::byte *>(nonIndexedElements.buf()),
                                    nonIndexedElements.len());
     BSONArrayBuilder splitsBuilder;
-    for (const auto &split : splits)
+    for (const auto &split : splits) {
         splitsBuilder.appendBinData(split.size(), BinDataGeneral, split.data());
+        LOGV2(30017,
+            "ErasureCoder::encodeDocument",
+            "split_data"_attr = reinterpret_cast<char*>split.data());
+    }
 
     // Append erasure-coded length and splits field.
     documentBuilder.appendNumber(lengthFieldName, nonIndexedElements.len());

@@ -81,9 +81,17 @@ void SplitCollector::collect() noexcept {
                       "SplitCollector::collect",
                       "memId"_attr = memId,
                       "qresult"_attr = qresult.toString());
-                
-                this->_splits.emplace_back(
-                    std::make_pair(qresult.getStringField("o").getStringField(splitsFieldName), memId));
+
+                if (qresult.hasField("o") && qresult.getObjectField("o").hasField(splitsFieldName)) {
+                    this->_splits.emplace_back(std::make_pair(
+                        qresult.getObjectField("o").getStringField(splitsFieldName), memId));
+                } else {
+                    // invairant
+                    LOGV2(30016,
+                          "SplitCollector::collect, split field not found",
+                          "memId"_attr = memId,
+                          "qresult"_attr = qresult.toString());
+                }
             },
             _nss,
             _makeFindQuery(),
