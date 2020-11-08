@@ -82,7 +82,8 @@ void SplitCollector::collect() noexcept {
                       "memId"_attr = memId,
                       "qresult"_attr = qresult.toString());
                 
-                this->_splits.emplace_back(std::make_pair(qresult.getStringField(splitsFieldName), memId));
+                this->_splits.emplace_back(
+                    std::make_pair(qresult.getStringField("o").getStringField(splitsFieldName), memId));
             },
             _nss,
             _makeFindQuery(),

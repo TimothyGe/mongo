@@ -228,7 +228,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     // repl for split collector
     const auto * replCoord = repl::ReplicationCoordinator::get(opCtx());
     LOGV2(30010,
-        "PlanExecutorImpl::_getNextImpl, collect splits",
+        "PlanExecutorImpl::_getNextImpl",
         "nss"_attr = collection()->ns().toString(),
         "isOnInternalDb"_attr = collection()->ns().isOnInternalDb(),
         "primary"_attr = replCoord->getMemberState().primary());
