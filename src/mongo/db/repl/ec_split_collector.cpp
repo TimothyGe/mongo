@@ -65,34 +65,37 @@ void SplitCollector::_collect_per_target(const int memId) {
     auto connStatus = _connect(conn, target);
 
     BSONObj splitBSONObj;
+    bool success = false;
     conn->query(
-        [=, &splitBSONObj](DBClientCursorBatchIterator& i) {
+        [=, &splitBSONObj, &success](DBClientCursorBatchIterator& i) {
             BSONObj qresult;
             while (i.moreInCurrentBatch()) {
                 qresult = i.nextSafe();
-            }
 
-            if (qresult.hasField(splitsFieldName)) {
-                LOGV2(30015,
-                      "get qresult",
-                      "memId"_attr = memId,
-                      "_splits"_attr = qresult.getField(splitsFieldName).toString());
+                if (qresult.hasField(splitsFieldName)) {
+                    LOGV2(30015,
+                          "get qresult",
+                          "memId"_attr = memId,
+                          "_splits"_attr = qresult.getField(splitsFieldName).toString());
 
-                const std::vector<BSONElement> arr = qresult.getField(splitsFieldName).Array();
-                BSONElement elem = arr[0];
-                // invariant(arr.size() == 1);
-                LOGV2(30019,
-                      "collect, array",
-                      "memId"_attr = memId,
-                      "[0].data"_attr = elem.toString());
-                checkBSONType(BSONType::BinData, elem);
-                splitBSONObj = BSON(elem);
-            } else {
-                // error
-                LOGV2(30016,
-                      "split field not found",
-                      "memId"_attr = memId,
-                      "qresult"_attr = qresult.toString());
+                    const std::vector<BSONElement> arr = qresult.getField(splitsFieldName).Array();
+                    BSONElement elem = arr[0];
+                    // invariant(arr.size() == 1);
+                    LOGV2(30019,
+                          "collect, array",
+                          "memId"_attr = memId,
+                          "[0].data"_attr = elem.toString());
+                    checkBSONType(BSONType::BinData, elem);
+                    splitBSONObj = BSON(elem);
+                    success = true;
+                } else {
+                    // error
+                    LOGV2(30016,
+                          "split field not found",
+                          "memId"_attr = memId,
+                          "qresult"_attr = qresult.toString());
+                }
+                // invariant(!i.moreInCurrentBatch());
             }
         },
         _nss,
@@ -100,7 +103,7 @@ void SplitCollector::_collect_per_target(const int memId) {
         &_projection /* fieldsToReturn */,
         QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_Exhaust);
 
-    {
+    if (success) {
         stdx::unique_lock<Latch> lk(_mutex);
         if (_splits.size() < _nNeed) {
             _splits.push_back(std::make_pair(splitBSONObj.getOwned(), memId));
