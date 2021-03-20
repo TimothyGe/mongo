@@ -6,6 +6,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/util/bson_check.h"
+#include "mongo/client/connpool.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
@@ -61,8 +62,8 @@ void SplitCollector::_collect_per_target(const int memId) {
     const auto& members = _replCoord->getMemberData();
     const auto& target = members[memId].getHostAndPort();
 
-    auto conn = std::make_unique<DBClientConnection>(true);
-    auto connStatus = _connect(conn, target);
+    ScopedDbConnection sconn(ConnectionString(target));
+    DBClientConnection* conn = dynamic_cast<DBClientConnection*>(&sconn.conn());
 
     BSONObj splitBSONObj;
     bool success = false;
